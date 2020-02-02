@@ -8,10 +8,14 @@ import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
 import android.os.IBinder
+import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
+import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
@@ -23,10 +27,13 @@ import com.google.android.exoplayer2.util.Util
 class PlayerService : Service() {
     private lateinit var audioFocusPlayer: ExoPlayer
     private lateinit var playerNotificationManager: PlayerNotificationManager
+    private lateinit var mediaSession: MediaSessionCompat
+    private lateinit var mediaSessionConnector: MediaSessionConnector
 
     companion object {
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
         const val PLAYBACK_NOTIFICATION_ID = 1
+        const val MEDIA_SESSION_TAG = "audio_radiofreccia";
     }
 
     override fun onCreate() {
@@ -81,6 +88,13 @@ class PlayerService : Service() {
         playerNotificationManager.setFastForwardIncrementMs(0)
         playerNotificationManager.setRewindIncrementMs(0)
         playerNotificationManager.setPlayer(audioFocusPlayer)
+
+        mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
+        mediaSession.isActive = true
+        playerNotificationManager.setMediaSessionToken(mediaSession.sessionToken)
+
+        mediaSessionConnector = MediaSessionConnector(mediaSession)
+        mediaSessionConnector.setPlayer(audioFocusPlayer)
     }
 
     private fun buildHlsMediaSource(): MediaSource {

@@ -11,15 +11,9 @@ class EmptyActivity : AppCompatActivity() {
     // Android lifecycle hooks.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        createMediaSession()
         createPlayer()
 
         finish()
-    }
-
-    // MediaSession related functions.
-    private fun createMediaSession() {
-        MediaSessionCompat(this, packageName)
     }
 
     // ExoPlayer related functions.
