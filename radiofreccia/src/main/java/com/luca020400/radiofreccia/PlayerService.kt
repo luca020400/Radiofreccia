@@ -8,14 +8,12 @@ import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
 import android.os.IBinder
-import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
-import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
@@ -33,7 +31,7 @@ class PlayerService : Service() {
     companion object {
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
         const val PLAYBACK_NOTIFICATION_ID = 1
-        const val MEDIA_SESSION_TAG = "audio_radiofreccia";
+        const val MEDIA_SESSION_TAG = "audio_radiofreccia"
     }
 
     override fun onCreate() {
@@ -103,6 +101,8 @@ class PlayerService : Service() {
     }
 
     override fun onDestroy() {
+        mediaSession.release()
+        mediaSessionConnector.setPlayer(null)
         playerNotificationManager.setPlayer(null)
         audioFocusPlayer.release() // player instance can't be used again.
 
