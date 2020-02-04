@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
 import android.os.IBinder
+import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
 import com.google.android.exoplayer2.ExoPlaybackException
@@ -15,6 +16,7 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
+import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.source.BehindLiveWindowException
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
@@ -22,12 +24,16 @@ import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import com.google.android.exoplayer2.util.Util
+import com.google.gson.Gson
+import com.luca020400.radiofreccia.classes.Song
 
 class PlayerService : Service() {
     private lateinit var audioFocusPlayer: ExoPlayer
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
+
+    private var song: Song? = null
 
     private val mediaSource by lazy {
         HlsMediaSource.Factory(DefaultDataSourceFactory(this,
@@ -76,6 +82,13 @@ class PlayerService : Service() {
                 return false
             }
         })
+        audioFocusPlayer.metadataComponent?.addMetadataOutput {
+            for (i in 0 until it.length()) {
+                val string = it.toString()
+                val cutString = string.substring(40, string.length - 1)
+                song = Gson().fromJson(cutString, Song::class.java)
+            }
+        };
         audioFocusPlayer.prepare(mediaSource)
         audioFocusPlayer.playWhenReady = true
 
@@ -87,7 +100,7 @@ class PlayerService : Service() {
                 PLAYBACK_NOTIFICATION_ID,
                 object : MediaDescriptionAdapter {
                     override fun getCurrentContentTitle(player: Player): String {
-                        return "Radiofreccia"
+                        return song?.songInfo?.present?.mus_sng_title ?: ""
                     }
 
                     override fun createCurrentContentIntent(player: Player): PendingIntent? {
@@ -95,7 +108,7 @@ class PlayerService : Service() {
                     }
 
                     override fun getCurrentContentText(player: Player): String? {
-                        return null
+                        return song?.songInfo?.present?.mus_art_name
                     }
 
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
@@ -121,6 +134,11 @@ class PlayerService : Service() {
         playerNotificationManager.setMediaSessionToken(mediaSession.sessionToken)
 
         mediaSessionConnector = MediaSessionConnector(mediaSession)
+        mediaSessionConnector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
+            override fun getMediaDescription(player: Player, windowIndex: Int): MediaDescriptionCompat {
+                return Utils.getMediaDescription(song)
+            }
+        })
         mediaSessionConnector.setPlayer(audioFocusPlayer)
     }
 
