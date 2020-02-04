@@ -10,11 +10,12 @@ import android.net.Uri
 import android.os.IBinder
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
+import com.google.android.exoplayer2.ExoPlaybackException
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
-import com.google.android.exoplayer2.source.MediaSource
+import com.google.android.exoplayer2.source.BehindLiveWindowException
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
@@ -27,6 +28,11 @@ class PlayerService : Service() {
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
+
+    private val mediaSource by lazy {
+        HlsMediaSource.Factory(DefaultDataSourceFactory(this, Util.getUserAgent(this, getString(R.string.app_name))))
+                .createMediaSource(Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"))
+    }
 
     companion object {
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
@@ -47,7 +53,29 @@ class PlayerService : Service() {
                 audioManager,
                 SimpleExoPlayer.Builder(this).build()
         )
-        audioFocusPlayer.prepare(buildHlsMediaSource())
+        audioFocusPlayer.addListener(object : Player.EventListener {
+            override fun onPlayerError(e: ExoPlaybackException) {
+                if (isBehindLiveWindow(e)) {
+                    audioFocusPlayer.prepare(mediaSource, true, false);
+                }
+            }
+
+            fun isBehindLiveWindow(e: ExoPlaybackException): Boolean {
+                if (e.type != ExoPlaybackException.TYPE_SOURCE) {
+                    return false
+                }
+
+                var cause: Throwable? = e.sourceException
+                while (cause != null) {
+                    if (cause is BehindLiveWindowException) {
+                        return true
+                    }
+                    cause = cause.cause
+                }
+                return false
+            }
+        })
+        audioFocusPlayer.prepare(mediaSource)
         audioFocusPlayer.playWhenReady = true
 
         playerNotificationManager = PlayerNotificationManager.createWithNotificationChannel(
@@ -93,11 +121,6 @@ class PlayerService : Service() {
 
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setPlayer(audioFocusPlayer)
-    }
-
-    private fun buildHlsMediaSource(): MediaSource {
-        return HlsMediaSource.Factory(DefaultDataSourceFactory(this, Util.getUserAgent(this, getString(R.string.app_name))))
-                .createMediaSource(Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"))
     }
 
     override fun onDestroy() {
