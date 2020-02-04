@@ -30,7 +30,8 @@ class PlayerService : Service() {
     private lateinit var mediaSessionConnector: MediaSessionConnector
 
     private val mediaSource by lazy {
-        HlsMediaSource.Factory(DefaultDataSourceFactory(this, Util.getUserAgent(this, getString(R.string.app_name))))
+        HlsMediaSource.Factory(DefaultDataSourceFactory(this,
+                Util.getUserAgent(this, getString(R.string.app_name))))
                 .createMediaSource(Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"))
     }
 
@@ -56,7 +57,7 @@ class PlayerService : Service() {
         audioFocusPlayer.addListener(object : Player.EventListener {
             override fun onPlayerError(e: ExoPlaybackException) {
                 if (isBehindLiveWindow(e)) {
-                    audioFocusPlayer.prepare(mediaSource, true, false);
+                    audioFocusPlayer.prepare(mediaSource, true, false)
                 }
             }
 
