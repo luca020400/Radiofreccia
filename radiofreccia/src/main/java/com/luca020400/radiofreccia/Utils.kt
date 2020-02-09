@@ -7,9 +7,11 @@ object Utils {
     fun getMediaDescription(song: Song?): MediaDescriptionCompat {
         val builder = MediaDescriptionCompat.Builder()
         song?.let {
-            builder.setMediaId(song.songInfo.present.mus_art_id.toString())
-                    .setTitle(song.songInfo.present.mus_sng_title)
-                    .setDescription(song.songInfo.present.mus_art_name)
+            it.songInfo.present?.let { present ->
+                builder.setMediaId(present.mus_art_id.toString())
+                        .setTitle(present.mus_sng_title)
+                        .setDescription(present.mus_art_name)
+            }
         }
         return builder.build()
     }
