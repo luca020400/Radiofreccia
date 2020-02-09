@@ -5,16 +5,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
 import android.media.AudioManager
 import android.net.Uri
 import android.os.IBinder
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
 import com.google.android.exoplayer2.ExoPlaybackException
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
@@ -135,7 +131,7 @@ class PlayerService : Service() {
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
                         song?.let {
                             it.songInfo.present?.let { present ->
-                                loadBitmap(present.mus_sng_itunescoverbig, callback)
+                                Utils.loadBitmap(this@PlayerService, present.mus_sng_itunescoverbig, callback)
                             }
                         }
                         return null
@@ -183,18 +179,5 @@ class PlayerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return START_STICKY
-    }
-
-    private fun loadBitmap(url: String, callback: BitmapCallback) {
-        Glide.with(this)
-                .asBitmap()
-                .load(url)
-                .into(object : CustomTarget<Bitmap>() {
-                    override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                        callback.onBitmap(resource)
-                    }
-
-                    override fun onLoadCleared(placeholder: Drawable?) {}
-                })
     }
 }
