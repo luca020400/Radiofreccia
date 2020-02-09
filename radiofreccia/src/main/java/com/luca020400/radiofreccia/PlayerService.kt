@@ -32,8 +32,7 @@ class PlayerService : Service() {
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
-
-    private var song: Song? = null
+    private lateinit var song: Song
 
     private val mediaSource by lazy {
         HlsMediaSource.Factory(DefaultDataSourceFactory(this,
@@ -107,21 +106,19 @@ class PlayerService : Service() {
                 PLAYBACK_NOTIFICATION_ID,
                 object : MediaDescriptionAdapter {
                     override fun getCurrentContentTitle(player: Player): String {
-                        song?.let {
-                            it.songInfo.present?.let { present ->
+                        if (::song.isInitialized) {
+                            song.songInfo.present?.let { present ->
                                 return present.mus_sng_title
                             }
                         }
                         return ""
                     }
 
-                    override fun createCurrentContentIntent(player: Player): PendingIntent? {
-                        return null
-                    }
+                    override fun createCurrentContentIntent(player: Player): PendingIntent? = null
 
                     override fun getCurrentContentText(player: Player): String? {
-                        song?.let {
-                            it.songInfo.present?.let { present ->
+                        if (::song.isInitialized) {
+                            song.songInfo.present?.let { present ->
                                 return present.mus_art_name
                             }
                         }
@@ -129,8 +126,8 @@ class PlayerService : Service() {
                     }
 
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
-                        song?.let {
-                            it.songInfo.present?.let { present ->
+                        if (::song.isInitialized) {
+                            song.songInfo.present?.let { present ->
                                 Utils.loadBitmap(this@PlayerService, present.mus_sng_itunescoverbig, callback)
                             }
                         }
@@ -157,9 +154,12 @@ class PlayerService : Service() {
 
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
-            override fun getMediaDescription(player: Player, windowIndex: Int): MediaDescriptionCompat {
-                return Utils.getMediaDescription(song)
-            }
+            override fun getMediaDescription(player: Player, windowIndex: Int) =
+                    if (::song.isInitialized) {
+                        Utils.getMediaDescription(song)
+                    } else {
+                        MediaDescriptionCompat.Builder().build()
+                    }
         })
         mediaSessionConnector.setPlayer(audioFocusPlayer)
     }

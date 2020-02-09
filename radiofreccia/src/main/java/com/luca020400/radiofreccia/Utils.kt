@@ -12,15 +12,14 @@ import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.luca020400.radiofreccia.classes.Song
 
 object Utils {
-    fun getMediaDescription(song: Song?): MediaDescriptionCompat {
+    fun getMediaDescription(song: Song): MediaDescriptionCompat {
         val builder = MediaDescriptionCompat.Builder()
-        song?.let {
-            it.songInfo.present?.let { present ->
-                builder.setMediaId(present.mus_art_id.toString())
-                        .setTitle(present.mus_sng_title)
-                        .setDescription(present.mus_art_name)
-                        .setMediaUri(Uri.parse(present.mus_sng_itunescoverbig))
-            }
+        song.songInfo.present?.let { present ->
+            builder.setMediaId(present.mus_art_id.toString())
+                    .setTitle(present.mus_sng_title)
+                    .setDescription(present.mus_art_name)
+                    .setMediaUri(Uri.parse(present.mus_sng_itunescoverbig))
+
         }
         return builder.build()
     }
