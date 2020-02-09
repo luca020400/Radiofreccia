@@ -84,11 +84,18 @@ class PlayerService : Service() {
         })
         audioFocusPlayer.metadataComponent?.addMetadataOutput {
             for (i in 0 until it.length()) {
-                val string = it.toString()
-                val cutString = string.substring(40, string.length - 1)
-                song = Gson().fromJson(cutString, Song::class.java)
+                try {
+                    val string = it.toString()
+                    val cutString = string.substring(40, string.length - 1)
+                    song = Gson().fromJson(cutString, Song::class.java)
+                    playerNotificationManager.invalidate()
+                    mediaSessionConnector.invalidateMediaSessionMetadata()
+                } catch (e: Exception) {
+                    // Things can go horribly wrong here
+                    // Do nothing if we fail
+                }
             }
-        };
+        }
         audioFocusPlayer.prepare(mediaSource)
         audioFocusPlayer.playWhenReady = true
 
@@ -100,7 +107,11 @@ class PlayerService : Service() {
                 PLAYBACK_NOTIFICATION_ID,
                 object : MediaDescriptionAdapter {
                     override fun getCurrentContentTitle(player: Player): String {
-                        return song?.songInfo?.present?.mus_sng_title ?: ""
+                        song?.let {
+                            return it.songInfo.present.mus_sng_title
+                        } ?: run {
+                            return ""
+                        }
                     }
 
                     override fun createCurrentContentIntent(player: Player): PendingIntent? {
@@ -108,7 +119,11 @@ class PlayerService : Service() {
                     }
 
                     override fun getCurrentContentText(player: Player): String? {
-                        return song?.songInfo?.present?.mus_art_name
+                        song?.let {
+                            return it.songInfo.present.mus_art_name
+                        } ?: run {
+                            return null
+                        }
                     }
 
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
@@ -146,7 +161,7 @@ class PlayerService : Service() {
         mediaSession.release()
         mediaSessionConnector.setPlayer(null)
         playerNotificationManager.setPlayer(null)
-        audioFocusPlayer.release() // player instance can't be used again.
+        audioFocusPlayer.release()
 
         super.onDestroy()
     }
