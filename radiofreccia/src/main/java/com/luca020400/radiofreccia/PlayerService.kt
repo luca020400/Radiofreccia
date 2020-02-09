@@ -35,9 +35,12 @@ class PlayerService : Service() {
     private lateinit var song: Song
 
     private val mediaSource by lazy {
-        HlsMediaSource.Factory(DefaultDataSourceFactory(this,
-                Util.getUserAgent(this, getString(R.string.app_name))))
-                .createMediaSource(Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"))
+        val dataSourceFactory = DefaultDataSourceFactory(
+                this, Util.getUserAgent(this, getString(R.string.app_name)))
+        return@lazy HlsMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(
+                        Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8")
+                )
     }
 
     companion object {
