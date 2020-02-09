@@ -108,10 +108,11 @@ class PlayerService : Service() {
                 object : MediaDescriptionAdapter {
                     override fun getCurrentContentTitle(player: Player): String {
                         song?.let {
-                            return it.songInfo.present.mus_sng_title
-                        } ?: run {
-                            return ""
+                            it.songInfo.present?.let { present ->
+                                return present.mus_sng_title
+                            }
                         }
+                        return ""
                     }
 
                     override fun createCurrentContentIntent(player: Player): PendingIntent? {
@@ -120,10 +121,11 @@ class PlayerService : Service() {
 
                     override fun getCurrentContentText(player: Player): String? {
                         song?.let {
-                            return it.songInfo.present.mus_art_name
-                        } ?: run {
-                            return null
+                            it.songInfo.present?.let { present ->
+                                return present.mus_art_name
+                            }
                         }
+                        return null
                     }
 
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
