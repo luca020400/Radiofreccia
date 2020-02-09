@@ -55,8 +55,7 @@ dependencies {
     // ExoPlayer v2 MediaSession extension
     implementation "com.google.android.exoplayer:extension-mediasession:$exoplayer_version"
 
-    // Material Design Components
-    implementation 'com.google.android.material:material:1.1.0'
+    // AndroidX
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation "androidx.media:media:1.1.0"
 
