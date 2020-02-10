@@ -113,6 +113,7 @@ class PlayerService : Service() {
                             song.songInfo.present?.let { present ->
                                 return present.mus_sng_title
                             }
+                            return song.songInfo.show.prg_title
                         }
                         return ""
                     }
@@ -124,6 +125,7 @@ class PlayerService : Service() {
                             song.songInfo.present?.let { present ->
                                 return present.mus_art_name
                             }
+                            return song.songInfo.show.speakers
                         }
                         return null
                     }
@@ -132,7 +134,9 @@ class PlayerService : Service() {
                         if (::song.isInitialized) {
                             song.songInfo.present?.let { present ->
                                 Utils.loadBitmap(this@PlayerService, present.mus_sng_itunescoverbig, callback)
+                                return null
                             }
+                            Utils.loadBitmap(this@PlayerService, song.songInfo.show.image400, callback)
                         }
                         return null
                     }

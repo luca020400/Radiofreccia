@@ -20,6 +20,11 @@ object Utils {
                     .setDescription(present.mus_art_name)
                     .setMediaUri(Uri.parse(present.mus_sng_itunescoverbig))
 
+        } ?: run {
+            builder.setMediaId(song.songInfo.show.chaId.toString())
+                    .setTitle(song.songInfo.show.prg_title)
+                    .setDescription(song.songInfo.show.speakers)
+                    .setMediaUri(Uri.parse(song.songInfo.show.image400))
         }
         return builder.build()
     }
