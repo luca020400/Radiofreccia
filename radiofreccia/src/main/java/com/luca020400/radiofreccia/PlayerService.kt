@@ -3,7 +3,10 @@ package com.luca020400.radiofreccia
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
@@ -33,6 +36,12 @@ class PlayerService : Service() {
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
     private lateinit var song: Song
+
+    private val mediaReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            audioFocusPlayer.playWhenReady = false
+        }
+    }
 
     private val mediaSource by lazy {
         val dataSourceFactory = DefaultDataSourceFactory(
@@ -169,6 +178,8 @@ class PlayerService : Service() {
                     }
         })
         mediaSessionConnector.setPlayer(audioFocusPlayer)
+
+        registerReceiver(mediaReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
     }
 
     override fun onDestroy() {
@@ -176,6 +187,7 @@ class PlayerService : Service() {
         mediaSessionConnector.setPlayer(null)
         playerNotificationManager.setPlayer(null)
         audioFocusPlayer.release()
+        unregisterReceiver(mediaReceiver)
 
         super.onDestroy()
     }
