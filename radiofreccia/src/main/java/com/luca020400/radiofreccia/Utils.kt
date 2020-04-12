@@ -16,14 +16,14 @@ object Utils {
         song.songInfo.present?.let { present ->
             builder.setMediaId(present.mus_art_id.toString())
                     .setTitle(present.mus_sng_title)
-                    .setDescription(present.mus_art_name)
-                    .setMediaUri(Uri.parse(present.mus_sng_itunescoverbig))
-
+                    .setSubtitle(present.mus_art_name)
+                    .setDescription(present.mus_sng_itunesalbumname)
+                    .setIconUri(Uri.parse(present.mus_sng_itunescoverbig))
         } ?: run {
             builder.setMediaId(song.songInfo.show.chaId.toString())
                     .setTitle(song.songInfo.show.prg_title)
-                    .setDescription(song.songInfo.show.speakers)
-                    .setMediaUri(Uri.parse(song.songInfo.show.image400))
+                    .setSubtitle(song.songInfo.show.speakers)
+                    .setIconUri(Uri.parse(song.songInfo.show.image400))
         }
         return builder.build()
     }
