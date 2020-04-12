@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Bundle
 import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.MediaMetadataCompat.*
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
@@ -14,16 +16,29 @@ object Utils {
     fun getMediaDescription(song: Song): MediaDescriptionCompat {
         val builder = MediaDescriptionCompat.Builder()
         song.songInfo.present?.let { present ->
+            val bundle = Bundle().apply {
+                putString(METADATA_KEY_TITLE, present.mus_sng_title)
+                putString(METADATA_KEY_ARTIST, present.mus_art_name)
+                putString(METADATA_KEY_ALBUM, present.mus_sng_itunesalbumname)
+                putString(METADATA_KEY_ART_URI, Uri.parse(present.mus_sng_itunescoverbig).toString())
+            }
             builder.setMediaId(present.mus_art_id.toString())
                     .setTitle(present.mus_sng_title)
                     .setSubtitle(present.mus_art_name)
                     .setDescription(present.mus_sng_itunesalbumname)
                     .setIconUri(Uri.parse(present.mus_sng_itunescoverbig))
+                    .setExtras(bundle)
         } ?: run {
+            val bundle = Bundle().apply {
+                putString(METADATA_KEY_TITLE, song.songInfo.show.prg_title)
+                putString(METADATA_KEY_ARTIST, song.songInfo.show.speakers)
+                putString(METADATA_KEY_ART_URI, Uri.parse(song.songInfo.show.image400).toString())
+            }
             builder.setMediaId(song.songInfo.show.chaId.toString())
                     .setTitle(song.songInfo.show.prg_title)
                     .setSubtitle(song.songInfo.show.speakers)
                     .setIconUri(Uri.parse(song.songInfo.show.image400))
+                    .setExtras(bundle)
         }
         return builder.build()
     }
