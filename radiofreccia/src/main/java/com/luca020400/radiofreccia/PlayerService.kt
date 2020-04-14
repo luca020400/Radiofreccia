@@ -159,6 +159,7 @@ class PlayerService : Service() {
                         stopSelf()
                     }
                 })
+        playerNotificationManager.setUseStopAction(true)
         playerNotificationManager.setUseNavigationActions(false)
         playerNotificationManager.setFastForwardIncrementMs(0)
         playerNotificationManager.setRewindIncrementMs(0)
