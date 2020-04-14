@@ -130,22 +130,22 @@ class PlayerService : Service() {
                     override fun createCurrentContentIntent(player: Player): PendingIntent? = null
 
                     override fun getCurrentContentText(player: Player): String? {
-                        if (::song.isInitialized) {
-                            song.songInfo.present?.let { present ->
-                                return present.mus_art_name
+                        if (::song.isInitialized) with(song.songInfo) {
+                            this.present?.let {
+                                return it.mus_art_name
                             }
-                            return song.songInfo.show.speakers
+                            return this.show.speakers
                         }
                         return null
                     }
 
                     override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
-                        if (::song.isInitialized) {
-                            song.songInfo.present?.let { present ->
-                                Utils.loadBitmap(this@PlayerService, present.mus_sng_itunescoverbig, callback)
+                        if (::song.isInitialized) with(song.songInfo) {
+                            this.present?.let {
+                                Utils.loadBitmap(this@PlayerService, it.mus_sng_itunescoverbig, callback)
                                 return null
                             }
-                            Utils.loadBitmap(this@PlayerService, song.songInfo.show.image400, callback)
+                            Utils.loadBitmap(this@PlayerService, this.show.image400, callback)
                         }
                         return null
                     }
