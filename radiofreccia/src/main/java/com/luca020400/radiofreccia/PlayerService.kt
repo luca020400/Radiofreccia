@@ -95,8 +95,8 @@ class PlayerService : Service() {
         })
         audioFocusPlayer.metadataComponent?.addMetadataOutput {
             try {
-                val string = it.toString()
-                val cutString = string.substring(40, string.length - 1)
+                val string = it.get(0).toString()
+                val cutString = string.substring(string.indexOf("{\"songInfo\""))
                 song = Gson().fromJson(cutString, Song::class.java)
                 playerNotificationManager.invalidate()
                 mediaSessionConnector.invalidateMediaSessionMetadata()
