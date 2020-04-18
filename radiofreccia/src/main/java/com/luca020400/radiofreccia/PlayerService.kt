@@ -94,17 +94,15 @@ class PlayerService : Service() {
             }
         })
         audioFocusPlayer.metadataComponent?.addMetadataOutput {
-            for (i in 0 until it.length()) {
-                try {
-                    val string = it.toString()
-                    val cutString = string.substring(40, string.length - 1)
-                    song = Gson().fromJson(cutString, Song::class.java)
-                    playerNotificationManager.invalidate()
-                    mediaSessionConnector.invalidateMediaSessionMetadata()
-                } catch (e: Exception) {
-                    // Things can go horribly wrong here
-                    // Do nothing if we fail
-                }
+            try {
+                val string = it.toString()
+                val cutString = string.substring(40, string.length - 1)
+                song = Gson().fromJson(cutString, Song::class.java)
+                playerNotificationManager.invalidate()
+                mediaSessionConnector.invalidateMediaSessionMetadata()
+            } catch (e: Exception) {
+                // Things can go horribly wrong here
+                // Do nothing if we fail
             }
         }
         audioFocusPlayer.prepare(mediaSource)
