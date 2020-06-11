@@ -35,7 +35,8 @@ class PlayerService : Service() {
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
-    private lateinit var song: Song
+
+    private var song: Song? = null
 
     private val mediaReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -46,16 +47,14 @@ class PlayerService : Service() {
     private val mediaSource by lazy {
         val dataSourceFactory = DefaultDataSourceFactory(
                 this, Util.getUserAgent(this, getString(R.string.app_name)))
-        return@lazy HlsMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(
-                        Uri.parse("https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8")
-                )
+        HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(MEDIA_URL))
     }
 
     companion object {
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
         const val PLAYBACK_NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "audio_radiofreccia"
+        const val MEDIA_URL = "https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"
     }
 
     override fun onCreate() {
@@ -116,11 +115,8 @@ class PlayerService : Service() {
                 PLAYBACK_NOTIFICATION_ID,
                 object : MediaDescriptionAdapter {
                     override fun getCurrentContentTitle(player: Player): String {
-                        if (::song.isInitialized) {
-                            song.songInfo.present?.let { present ->
-                                return present.mus_sng_title
-                            }
-                            return song.songInfo.show.prg_title
+                        song?.let {
+                            return it.songInfo.present?.mus_sng_title ?: it.songInfo.show.prg_title
                         }
                         return ""
                     }
@@ -128,32 +124,31 @@ class PlayerService : Service() {
                     override fun createCurrentContentIntent(player: Player): PendingIntent? = null
 
                     override fun getCurrentContentText(player: Player): String? {
-                        if (::song.isInitialized) with(song.songInfo) {
-                            this.present?.let {
-                                return it.mus_art_name
-                            }
-                            return this.show.speakers
+                        song?.let {
+                            return it.songInfo.present?.mus_art_name ?: it.songInfo.show.speakers
                         }
                         return null
                     }
 
-                    override fun getCurrentLargeIcon(player: Player, callback: BitmapCallback): Bitmap? {
-                        if (::song.isInitialized) with(song.songInfo) {
-                            this.present?.let {
-                                Utils.loadBitmap(this@PlayerService, it.mus_sng_itunescoverbig, callback)
-                                return null
-                            }
-                            Utils.loadBitmap(this@PlayerService, this.show.image400, callback)
+                    override fun getCurrentLargeIcon(player: Player,
+                                                     callback: BitmapCallback): Bitmap? {
+                        song?.let {
+                            Utils.loadBitmap(this@PlayerService,
+                                    it.songInfo.present?.mus_sng_itunescoverbig
+                                            ?: it.songInfo.show.image400, callback)
                         }
                         return null
                     }
                 },
                 object : PlayerNotificationManager.NotificationListener {
-                    override fun onNotificationPosted(notificationId: Int, notification: Notification, ongoing: Boolean) {
+                    override fun onNotificationPosted(notificationId: Int,
+                                                      notification: Notification,
+                                                      ongoing: Boolean) {
                         startForeground(notificationId, notification)
                     }
 
-                    override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+                    override fun onNotificationCancelled(notificationId: Int,
+                                                         dismissedByUser: Boolean) {
                         stopSelf()
                     }
                 })
@@ -170,11 +165,9 @@ class PlayerService : Service() {
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
             override fun getMediaDescription(player: Player, windowIndex: Int) =
-                    if (::song.isInitialized) {
-                        Utils.getMediaDescription(song)
-                    } else {
-                        MediaDescriptionCompat.Builder().build()
-                    }
+                    song?.let {
+                        Utils.getMediaDescription(it)
+                    } ?: MediaDescriptionCompat.Builder().build()
         })
         mediaSessionConnector.setPlayer(audioFocusPlayer)
 
