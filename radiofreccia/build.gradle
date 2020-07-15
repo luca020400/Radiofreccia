@@ -40,7 +40,7 @@ android {
 }
 
 ext {
-    exoplayer_version = "2.11.5"
+    exoplayer_version = "2.11.7"
 }
 
 dependencies {
