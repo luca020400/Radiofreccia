@@ -20,7 +20,10 @@ object Utils {
                 putString(METADATA_KEY_TITLE, present.mus_sng_title)
                 putString(METADATA_KEY_ARTIST, present.mus_art_name)
                 putString(METADATA_KEY_ALBUM, present.mus_sng_itunesalbumname)
-                putString(METADATA_KEY_ART_URI, Uri.parse(present.mus_sng_itunescoverbig).toString())
+                try {
+                    putString(METADATA_KEY_ART_URI, Uri.parse(present.mus_sng_itunescoverbig).toString())
+                } catch (e: Exception) {
+                }
             }
             builder.setMediaId(present.mus_art_id.toString())
                     .setTitle(present.mus_sng_title)
@@ -32,7 +35,10 @@ object Utils {
             val bundle = Bundle().apply {
                 putString(METADATA_KEY_TITLE, song.songInfo.show.prg_title)
                 putString(METADATA_KEY_ARTIST, song.songInfo.show.speakers)
-                putString(METADATA_KEY_ART_URI, Uri.parse(song.songInfo.show.image400).toString())
+                try {
+                    putString(METADATA_KEY_ART_URI, Uri.parse(song.songInfo.show.image400).toString())
+                } catch (e: Exception) {
+                }
             }
             builder.setMediaId(song.songInfo.show.chaId.toString())
                     .setTitle(song.songInfo.show.prg_title)
