@@ -14,18 +14,18 @@ import android.os.IBinder
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media.AudioAttributesCompat
-import com.google.android.exoplayer2.ExoPlaybackException
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.*
+import com.google.android.exoplayer2.Player.Listener
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
+import com.google.android.exoplayer2.metadata.Metadata
 import com.google.android.exoplayer2.source.BehindLiveWindowException
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
+import com.google.android.exoplayer2.upstream.HttpDataSource
 import com.google.android.exoplayer2.util.Util
 import com.google.gson.Gson
 import com.luca020400.radiofreccia.classes.Song
@@ -45,16 +45,24 @@ class PlayerService : Service() {
     }
 
     private val mediaSource by lazy {
+        val mediaItem: MediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(MEDIA_URL))
+            .build()
+
         val dataSourceFactory = DefaultDataSourceFactory(
-                this, Util.getUserAgent(this, getString(R.string.app_name)))
-        HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(MEDIA_URL))
+            this, Util.getUserAgent(this, getString(R.string.app_name))
+        )
+        HlsMediaSource.Factory(dataSourceFactory)
+            .setAllowChunklessPreparation(true)
+            .createMediaSource(mediaItem)
     }
 
     companion object {
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
         const val PLAYBACK_NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "audio_radiofreccia"
-        const val MEDIA_URL = "https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"
+        const val MEDIA_URL =
+            "https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"
     }
 
     override fun onCreate() {
@@ -62,29 +70,46 @@ class PlayerService : Service() {
 
         val audioManager = getSystemService(AudioManager::class.java) as AudioManager
         val audioAttributes = AudioAttributesCompat.Builder()
-                .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
-                .setUsage(AudioAttributesCompat.USAGE_MEDIA)
-                .build()
+            .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
+            .setUsage(AudioAttributesCompat.USAGE_MEDIA)
+            .build()
         audioFocusPlayer = AudioFocusWrapper(
-                audioAttributes,
-                audioManager,
-                SimpleExoPlayer.Builder(this).build()
+            audioAttributes,
+            audioManager,
+            SimpleExoPlayer.Builder(this).build()
         )
-        audioFocusPlayer.addListener(object : Player.EventListener {
-            override fun onPlayerError(e: ExoPlaybackException) {
-                if (isBehindLiveWindow(e)) {
-                    audioFocusPlayer.prepare(mediaSource, true, false)
+        audioFocusPlayer.addListener(object : Listener {
+            override fun onMetadata(metadata: Metadata) {
+                try {
+                    val string = metadata.get(0).toString()
+                    val cutString = string.substring(string.indexOf("{\"songInfo\""))
+                    with(Gson().fromJson(cutString, Song::class.java)) {
+                        if (this == song) return
+                        song = this
+                        playerNotificationManager.invalidate()
+                        mediaSessionConnector.invalidateMediaSessionMetadata()
+                    }
+                } catch (e: Exception) {
+                    // Things can go horribly wrong here
+                    // Do nothing if we fail
                 }
             }
 
-            fun isBehindLiveWindow(e: ExoPlaybackException): Boolean {
-                if (e.type != ExoPlaybackException.TYPE_SOURCE) {
+            override fun onPlayerError(error: PlaybackException) {
+                if (isBehindLiveWindowOrHttpError(error)) {
+                    audioFocusPlayer.seekToDefaultPosition()
+                    audioFocusPlayer.prepare()
+                }
+            }
+
+            fun isBehindLiveWindowOrHttpError(e: PlaybackException): Boolean {
+                if (e !is ExoPlaybackException) {
                     return false
                 }
 
                 var cause: Throwable? = e.sourceException
                 while (cause != null) {
-                    if (cause is BehindLiveWindowException) {
+                    if (cause is BehindLiveWindowException || cause is HttpDataSource.HttpDataSourceException) {
                         return true
                     }
                     cause = cause.cause
@@ -92,29 +117,19 @@ class PlayerService : Service() {
                 return false
             }
         })
-        audioFocusPlayer.metadataComponent?.addMetadataOutput {
-            try {
-                val string = it.get(0).toString()
-                val cutString = string.substring(string.indexOf("{\"songInfo\""))
-                song = Gson().fromJson(cutString, Song::class.java)
-                playerNotificationManager.invalidate()
-                mediaSessionConnector.invalidateMediaSessionMetadata()
-            } catch (e: Exception) {
-                // Things can go horribly wrong here
-                // Do nothing if we fail
-            }
-        }
-        audioFocusPlayer.prepare(mediaSource)
+        audioFocusPlayer.setMediaSource(mediaSource)
+        audioFocusPlayer.prepare()
         audioFocusPlayer.playWhenReady = true
 
-        playerNotificationManager = PlayerNotificationManager.createWithNotificationChannel(
-                this,
-                PLAYBACK_CHANNEL_ID,
-                R.string.playback_channel_name,
-                R.string.playback_channel_description,
-                PLAYBACK_NOTIFICATION_ID,
+        val playerNotificationManagerBuilder = PlayerNotificationManager.Builder(
+            this,
+            PLAYBACK_NOTIFICATION_ID,
+            PLAYBACK_CHANNEL_ID
+        ).setChannelNameResourceId(R.string.playback_channel_name)
+            .setChannelDescriptionResourceId(R.string.playback_channel_description)
+            .setMediaDescriptionAdapter(
                 object : MediaDescriptionAdapter {
-                    override fun getCurrentContentTitle(player: Player): String {
+                    override fun getCurrentContentTitle(player: Player): CharSequence {
                         song?.let {
                             return it.songInfo.present?.mus_sng_title ?: it.songInfo.show.prg_title
                         }
@@ -123,39 +138,47 @@ class PlayerService : Service() {
 
                     override fun createCurrentContentIntent(player: Player): PendingIntent? = null
 
-                    override fun getCurrentContentText(player: Player): String? {
+                    override fun getCurrentContentText(player: Player): CharSequence? {
                         song?.let {
                             return it.songInfo.present?.mus_art_name ?: it.songInfo.show.speakers
                         }
                         return null
                     }
 
-                    override fun getCurrentLargeIcon(player: Player,
-                                                     callback: BitmapCallback): Bitmap? {
+                    override fun getCurrentLargeIcon(
+                        player: Player,
+                        callback: BitmapCallback
+                    ): Bitmap? {
                         song?.let {
-                            Utils.loadBitmap(this@PlayerService,
-                                    it.songInfo.present?.mus_sng_itunescoverbig
-                                            ?: it.songInfo.show.image400, callback)
+                            Utils.loadBitmap(
+                                this@PlayerService,
+                                it.songInfo.present?.mus_sng_itunescoverbig
+                                    ?: it.songInfo.show.image400, callback
+                            )
                         }
                         return null
                     }
-                },
+                }).setNotificationListener(
                 object : PlayerNotificationManager.NotificationListener {
-                    override fun onNotificationPosted(notificationId: Int,
-                                                      notification: Notification,
-                                                      ongoing: Boolean) {
+                    override fun onNotificationPosted(
+                        notificationId: Int,
+                        notification: Notification,
+                        ongoing: Boolean
+                    ) {
                         startForeground(notificationId, notification)
                     }
 
-                    override fun onNotificationCancelled(notificationId: Int,
-                                                         dismissedByUser: Boolean) {
+                    override fun onNotificationCancelled(
+                        notificationId: Int,
+                        dismissedByUser: Boolean
+                    ) {
                         stopSelf()
                     }
                 })
+        playerNotificationManager = playerNotificationManagerBuilder.build()
         playerNotificationManager.setUseStopAction(true)
-        playerNotificationManager.setUseNavigationActions(false)
-        playerNotificationManager.setFastForwardIncrementMs(0)
-        playerNotificationManager.setRewindIncrementMs(0)
+        playerNotificationManager.setUseNextAction(false)
+        playerNotificationManager.setUsePreviousAction(false)
         playerNotificationManager.setPlayer(audioFocusPlayer)
 
         mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
@@ -165,9 +188,9 @@ class PlayerService : Service() {
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
             override fun getMediaDescription(player: Player, windowIndex: Int) =
-                    song?.let {
-                        Utils.getMediaDescription(it)
-                    } ?: MediaDescriptionCompat.Builder().build()
+                song?.let {
+                    Utils.getMediaDescription(it)
+                } ?: MediaDescriptionCompat.Builder().build()
         })
         mediaSessionConnector.setPlayer(audioFocusPlayer)
 
@@ -184,11 +207,7 @@ class PlayerService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 }
