@@ -25,7 +25,6 @@ import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.upstream.HttpDataSource
 import com.google.android.exoplayer2.util.Util
 import com.google.gson.Gson
 import com.luca020400.radiofreccia.classes.Song
@@ -62,7 +61,7 @@ class PlayerService : Service() {
         const val PLAYBACK_NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "audio_radiofreccia"
         const val MEDIA_URL =
-            "https://rtl-radio6-stream.thron.com/live/radio6/radio6/chunklist.m3u8"
+            "https://streamcdnm23-dd782ed59e2a4e86aabf6fc508674b59.msvdn.net/live/S3160845/0tuSetc8UFkF/playlist_audio.m3u8"
     }
 
     override fun onCreate() {
@@ -81,7 +80,7 @@ class PlayerService : Service() {
         audioFocusPlayer.addListener(object : Listener {
             override fun onMetadata(metadata: Metadata) {
                 try {
-                    val string = metadata.get(0).toString()
+                    val string = metadata.get(1).toString()
                     val cutString = string.substring(string.indexOf("{\"songInfo\""))
                     with(Gson().fromJson(cutString, Song::class.java)) {
                         if (this == song) return
@@ -96,20 +95,20 @@ class PlayerService : Service() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                if (isBehindLiveWindowOrHttpError(error)) {
+                if (isBehindLiveWindow(error)) {
                     audioFocusPlayer.seekToDefaultPosition()
                     audioFocusPlayer.prepare()
                 }
             }
 
-            fun isBehindLiveWindowOrHttpError(e: PlaybackException): Boolean {
+            fun isBehindLiveWindow(e: PlaybackException): Boolean {
                 if (e !is ExoPlaybackException) {
                     return false
                 }
 
                 var cause: Throwable? = e.sourceException
                 while (cause != null) {
-                    if (cause is BehindLiveWindowException || cause is HttpDataSource.HttpDataSourceException) {
+                    if (cause is BehindLiveWindowException) {
                         return true
                     }
                     cause = cause.cause
