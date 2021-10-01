@@ -9,7 +9,6 @@ import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat.*
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
-import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.luca020400.radiofreccia.classes.Song
 
 object Utils {
@@ -58,14 +57,14 @@ object Utils {
     fun loadBitmap(
         context: Context,
         url: String,
-        callback: PlayerNotificationManager.BitmapCallback
+        callback: (Bitmap) -> Unit
     ) {
         GlideApp.with(context)
             .asBitmap()
             .load(url)
             .into(object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                    callback.onBitmap(resource)
+                    callback(resource)
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {}
