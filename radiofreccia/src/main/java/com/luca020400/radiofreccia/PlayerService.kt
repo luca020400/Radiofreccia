@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.Player.Listener
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.metadata.Metadata
+import com.google.android.exoplayer2.metadata.id3.TextInformationFrame
 import com.google.android.exoplayer2.source.BehindLiveWindowException
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
@@ -82,9 +83,11 @@ class PlayerService : Service() {
         audioFocusPlayer.addListener(object : Listener {
             override fun onMetadata(metadata: Metadata) {
                 try {
-                    val string = metadata.get(1).toString()
-                    val cutString = string.substring(string.indexOf("{\"songInfo\""))
-                    with(Gson().fromJson(cutString, Song::class.java)) {
+                    // Reading the private data breaks the decoder.
+                    // PRIV: owner=com.apple.streaming.transportStreamTimestamp
+                    // val priv = metadata.get(0) as PrivFrame
+                    val frame = metadata.get(1) as TextInformationFrame
+                    with(Gson().fromJson(frame.value, Song::class.java)) {
                         if (this == song) return
                         song = this
                         playerNotificationManager.invalidate()
