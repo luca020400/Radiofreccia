@@ -176,9 +176,13 @@ class PlayerService : Service() {
                     }
                 })
         playerNotificationManager = playerNotificationManagerBuilder.build()
-        playerNotificationManager.setUseStopAction(true)
+        playerNotificationManager.setUseFastForwardAction(false)
+        playerNotificationManager.setUseFastForwardActionInCompactView(false)
         playerNotificationManager.setUseNextAction(false)
         playerNotificationManager.setUsePreviousAction(false)
+        playerNotificationManager.setUseRewindAction(false)
+        playerNotificationManager.setUseRewindActionInCompactView(false)
+        playerNotificationManager.setUseStopAction(true)
         playerNotificationManager.setPlayer(audioFocusPlayer)
 
         mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
