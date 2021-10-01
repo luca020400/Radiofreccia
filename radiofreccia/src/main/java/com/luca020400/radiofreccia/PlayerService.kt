@@ -157,7 +157,6 @@ class PlayerService : Service() {
                             Utils.loadBitmap(
                                 this@PlayerService, url
                             ) { bitmap: Bitmap ->
-                                urlBitmap.bitmap?.recycle()
                                 urlBitmap.url = url
                                 urlBitmap.bitmap = bitmap
                                 callback.onBitmap(bitmap)
