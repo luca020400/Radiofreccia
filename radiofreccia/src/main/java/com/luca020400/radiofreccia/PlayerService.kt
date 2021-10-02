@@ -200,6 +200,8 @@ class PlayerService : Service() {
 
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setQueueNavigator(object : TimelineQueueNavigator(mediaSession) {
+            override fun getSupportedQueueNavigatorActions(player: Player) = 0L
+
             override fun getMediaDescription(player: Player, windowIndex: Int) =
                 song?.let {
                     Utils.getMediaDescription(it)
