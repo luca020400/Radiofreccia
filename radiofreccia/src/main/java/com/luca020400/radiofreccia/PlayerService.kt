@@ -55,7 +55,6 @@ class PlayerService : Service() {
             this, Util.getUserAgent(this, getString(R.string.app_name))
         )
         HlsMediaSource.Factory(dataSourceFactory)
-            .setAllowChunklessPreparation(true)
             .createMediaSource(mediaItem)
     }
 
