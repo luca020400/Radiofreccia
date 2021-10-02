@@ -32,7 +32,7 @@ import com.luca020400.radiofreccia.classes.Song
 import com.luca020400.radiofreccia.classes.UrlBitmap
 
 class PlayerService : Service() {
-    private lateinit var audioFocusPlayer: ExoPlayer
+    private lateinit var wrapperPlayer: ForwardingPlayer
     private lateinit var playerNotificationManager: PlayerNotificationManager
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
@@ -42,7 +42,7 @@ class PlayerService : Service() {
 
     private val mediaReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            audioFocusPlayer.playWhenReady = false
+            wrapperPlayer.playWhenReady = false
         }
     }
 
@@ -74,7 +74,7 @@ class PlayerService : Service() {
             .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
             .setUsage(AudioAttributesCompat.USAGE_MEDIA)
             .build()
-        audioFocusPlayer = AudioFocusWrapper(
+        val audioFocusPlayer = AudioFocusWrapper(
             audioAttributes,
             audioManager,
             SimpleExoPlayer.Builder(this).build()
@@ -123,6 +123,15 @@ class PlayerService : Service() {
         audioFocusPlayer.setMediaSource(mediaSource)
         audioFocusPlayer.prepare()
         audioFocusPlayer.playWhenReady = true
+
+        wrapperPlayer = object : ForwardingPlayer(audioFocusPlayer) {
+            override fun getAvailableCommands(): Player.Commands {
+                return Player.Commands.Builder()
+                    .add(COMMAND_PREPARE_STOP)
+                    .add(COMMAND_PLAY_PAUSE)
+                    .build()
+            }
+        }
 
         val playerNotificationManagerBuilder = PlayerNotificationManager.Builder(
             this,
@@ -191,7 +200,7 @@ class PlayerService : Service() {
         playerNotificationManager.setUseRewindAction(false)
         playerNotificationManager.setUseRewindActionInCompactView(false)
         playerNotificationManager.setUseStopAction(true)
-        playerNotificationManager.setPlayer(audioFocusPlayer)
+        playerNotificationManager.setPlayer(wrapperPlayer)
 
         mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
         mediaSession.isActive = true
@@ -206,7 +215,7 @@ class PlayerService : Service() {
                     Utils.getMediaDescription(it)
                 } ?: MediaDescriptionCompat.Builder().build()
         })
-        mediaSessionConnector.setPlayer(audioFocusPlayer)
+        mediaSessionConnector.setPlayer(wrapperPlayer)
 
         registerReceiver(mediaReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
     }
@@ -215,7 +224,7 @@ class PlayerService : Service() {
         mediaSession.release()
         mediaSessionConnector.setPlayer(null)
         playerNotificationManager.setPlayer(null)
-        audioFocusPlayer.release()
+        wrapperPlayer.release()
         unregisterReceiver(mediaReceiver)
 
         super.onDestroy()
