@@ -34,7 +34,7 @@ data class Song(
             @Json(name = "mus_sng_id") val mus_sng_id: Int?,
             @Json(name = "mus_sng_title") val mus_sng_title: String,
             @Json(name = "mus_sng_itunesurl") val mus_sng_itunesurl: String,
-            @Json(name = "mus_sng_itunesreleasedate") val mus_sng_itunesreleasedate: String,
+            @Json(name = "mus_sng_itunesreleasedate") val mus_sng_itunesreleasedate: String?,
             @Json(name = "mus_sng_itunesalbumname") val mus_sng_itunesalbumname: String,
             @Json(name = "mus_sng_itunescoverbig") val mus_sng_itunescoverbig: String,
             @Json(name = "artistMedia") val artistMedia: String?,
