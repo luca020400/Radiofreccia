@@ -2,13 +2,13 @@ package com.luca020400.radiofreccia
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat.*
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
+import androidx.core.graphics.drawable.toBitmap
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.luca020400.radiofreccia.classes.Song
 
 object Utils {
@@ -59,15 +59,22 @@ object Utils {
         url: String,
         callback: (Bitmap) -> Unit
     ) {
-        GlideApp.with(context)
-            .asBitmap()
-            .load(url)
-            .into(object : CustomTarget<Bitmap>() {
-                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                    callback(resource)
+        val request = ImageRequest.Builder(context)
+            .data(url)
+            .target(
+                onStart = {
+                    // Handle the placeholder drawable.
+                },
+                onSuccess = {
+                    callback(it.toBitmap())
+                },
+                onError = {
+                    // Handle the error drawable.
                 }
+            )
+            .build()
+        context.imageLoader.enqueue(request)
+    }
 
-                override fun onLoadCleared(placeholder: Drawable?) {}
-            })
     }
 }
