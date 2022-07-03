@@ -3,17 +3,12 @@ package com.luca020400.radiofreccia
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
-import android.media.AudioManager
 import android.net.Uri
 import android.os.IBinder
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
-import androidx.media.AudioAttributesCompat
 import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.Player.Listener
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
@@ -35,12 +30,6 @@ class PlayerService : Service() {
     private lateinit var mediaSessionConnector: MediaSessionConnector
 
     private var song: Song? = null
-
-    private val mediaReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            wrapperPlayer.playWhenReady = false
-        }
-    }
 
     private val mediaSource by lazy {
         val mediaItem = MediaItem.Builder()
@@ -64,17 +53,11 @@ class PlayerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        val audioManager = getSystemService(AudioManager::class.java)
-        val audioAttributes = AudioAttributesCompat.Builder()
-            .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
-            .setUsage(AudioAttributesCompat.USAGE_MEDIA)
+        val player = ExoPlayer.Builder(this)
+            .setHandleAudioBecomingNoisy(true)
             .build()
-        val audioFocusPlayer = AudioFocusPlayer(
-            audioAttributes,
-            audioManager,
-            ExoPlayer.Builder(this).build()
-        )
-        audioFocusPlayer.addListener(object : Listener {
+
+        player.addListener(object : Listener {
             override fun onMetadata(metadata: Metadata) {
                 for (i in 0 until metadata.length()) {
                     val entry = metadata.get(i)
@@ -96,8 +79,8 @@ class PlayerService : Service() {
 
             override fun onPlayerError(error: PlaybackException) {
                 if (isBehindLiveWindow(error)) {
-                    audioFocusPlayer.seekToDefaultPosition()
-                    audioFocusPlayer.prepare()
+                    player.seekToDefaultPosition()
+                    player.prepare()
                 }
             }
 
@@ -116,11 +99,11 @@ class PlayerService : Service() {
                 return false
             }
         })
-        audioFocusPlayer.setMediaSource(mediaSource)
-        audioFocusPlayer.prepare()
-        audioFocusPlayer.playWhenReady = true
+        player.setMediaSource(mediaSource)
+        player.prepare()
+        player.playWhenReady = true
 
-        wrapperPlayer = object : ForwardingPlayer(audioFocusPlayer) {
+        wrapperPlayer = object : ForwardingPlayer(player) {
             override fun getAvailableCommands() =
                 Player.Commands.Builder()
                     .add(COMMAND_STOP)
@@ -208,8 +191,6 @@ class PlayerService : Service() {
                 } ?: MediaDescriptionCompat.Builder().build()
         })
         mediaSessionConnector.setPlayer(wrapperPlayer)
-
-        registerReceiver(mediaReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
     }
 
     override fun onDestroy() {
@@ -217,7 +198,6 @@ class PlayerService : Service() {
         mediaSessionConnector.mediaSession.release()
         playerNotificationManager.setPlayer(null)
         wrapperPlayer.release()
-        unregisterReceiver(mediaReceiver)
 
         super.onDestroy()
     }
