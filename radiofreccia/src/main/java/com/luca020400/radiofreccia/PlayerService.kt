@@ -21,8 +21,9 @@ import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
-import com.google.gson.Gson
 import com.luca020400.radiofreccia.classes.Song
+import com.luca020400.radiofreccia.classes.SongJsonAdapter
+import com.squareup.moshi.Moshi
 
 class PlayerService : Service() {
     private lateinit var wrapperPlayer: ForwardingPlayer
@@ -63,7 +64,8 @@ class PlayerService : Service() {
                     val entry = metadata.get(i)
                     if (entry is TextInformationFrame && entry.id == "TEXT") {
                         try {
-                            Gson().fromJson(entry.value, Song::class.java).let {
+                            val moshi: Moshi = Moshi.Builder().build()
+                            SongJsonAdapter(moshi).fromJson(entry.value).let {
                                 if (it == song) return
                                 song = it
                                 playerNotificationManager.invalidate()
