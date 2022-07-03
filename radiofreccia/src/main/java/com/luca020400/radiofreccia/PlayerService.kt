@@ -28,7 +28,6 @@ import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescripti
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.google.gson.Gson
 import com.luca020400.radiofreccia.classes.Song
-import com.luca020400.radiofreccia.classes.UrlBitmap
 
 class PlayerService : Service() {
     private lateinit var wrapperPlayer: ForwardingPlayer
@@ -36,7 +35,6 @@ class PlayerService : Service() {
     private lateinit var mediaSessionConnector: MediaSessionConnector
 
     private var song: Song? = null
-    private val urlBitmap = UrlBitmap()
 
     private val mediaReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -161,12 +159,9 @@ class PlayerService : Service() {
                     song?.let {
                         val url = it.songInfo.present?.mus_sng_itunescoverbig
                             ?: it.songInfo.show.image400
-                        if (url == urlBitmap.url) return urlBitmap.bitmap
                         Utils.loadBitmap(
                             this@PlayerService, url
                         ) { bitmap ->
-                            urlBitmap.url = url
-                            urlBitmap.bitmap = bitmap
                             callback.onBitmap(bitmap)
                         }
                     }
