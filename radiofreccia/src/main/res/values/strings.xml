@@ -18,4 +18,5 @@
     <string name="app_name">Radiofreccia</string>
     <string name="playback_channel_name">Radio</string>
     <string name="playback_channel_description">Musica via radio</string>
+    <string name="saved">Saved</string>
 </resources>

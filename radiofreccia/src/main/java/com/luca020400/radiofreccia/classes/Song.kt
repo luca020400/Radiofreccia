@@ -5,7 +5,7 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class Song(
-    @Json(name = "songInfo") val songInfo: SongInfo,
+    @Json(name = "songInfo") val songInfo: SongInfo?,
 ) {
     @JsonClass(generateAdapter = true)
     data class SongInfo(

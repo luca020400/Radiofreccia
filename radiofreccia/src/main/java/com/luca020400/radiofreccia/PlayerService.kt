@@ -6,9 +6,12 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.IBinder
+import android.os.*
+import android.os.IBinder.DeathRecipient
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
+import android.util.Log
+import androidx.annotation.GuardedBy
 import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.Player.Listener
 import com.google.android.exoplayer2.audio.AudioAttributes
@@ -25,6 +28,8 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.luca020400.radiofreccia.classes.Song
 import com.luca020400.radiofreccia.classes.SongJsonAdapter
 import com.squareup.moshi.Moshi
+import java.lang.ref.WeakReference
+
 
 class PlayerService : Service() {
     private lateinit var wrapperPlayer: ForwardingPlayer
@@ -44,7 +49,105 @@ class PlayerService : Service() {
             .createMediaSource(mediaItem)
     }
 
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    private val clients = hashMapOf<IBinder, RecorderClient>()
+    private val handler = object : Handler(Looper.myLooper()!!) {
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                MSG_REGISTER_CLIENT -> registerClient(
+                    RecorderClient(
+                        msg.replyTo,
+                        msg.replyTo.binder
+                    )
+                )
+                MSG_UNREGISTER_CLIENT -> synchronized(lock) {
+                    unregisterClientLocked(msg.replyTo.binder)
+                }
+                MSG_PAUSE -> wrapperPlayer.playWhenReady = !wrapperPlayer.playWhenReady
+                else -> super.handleMessage(msg)
+            }
+        }
+    }
+    private val messenger = Messenger(handler)
+
+    private class RecorderClient constructor(private val messenger: Messenger, val token: IBinder) {
+        lateinit var deathRecipient: DeathRecipient
+        fun send(message: Message?) {
+            try {
+                messenger.send(message)
+            } catch (e: RemoteException) {
+            }
+        }
+    }
+
+    private class PlayerClientDeathRecipient(
+        service: PlayerService,
+        private val client: RecorderClient,
+    ) : DeathRecipient {
+        val serviceRef: WeakReference<PlayerService>
+        override fun binderDied() {
+            val service: PlayerService = serviceRef.get() ?: return
+            synchronized(service.lock) {
+                service.unregisterClientLocked(client.token)
+            }
+        }
+
+        init {
+            client.deathRecipient = this
+            serviceRef = WeakReference(service)
+        }
+    }
+
+    private fun registerClient(client: RecorderClient) {
+        synchronized(lock) {
+            if (unregisterClientLocked(client.token)) {
+                Log.i(TAG, "Client was already registered, override it.")
+            }
+            clients.put(client.token, client)
+        }
+        try {
+            client.token.linkToDeath(PlayerClientDeathRecipient(this, client), 0)
+        } catch (ignored: RemoteException) {
+            // Already gone
+        }
+    }
+
+    private fun unregisterClients() {
+        synchronized(lock) {
+            for (client in clients.values) {
+                client.token.unlinkToDeath(client.deathRecipient, 0)
+            }
+        }
+    }
+
+    private fun notifySong(song: Song) {
+        val clients: List<RecorderClient>
+        synchronized(lock) {
+            clients = ArrayList(this.clients.values)
+        }
+        for (client in clients) {
+            client.send(handler.obtainMessage(MSG_SONG, song))
+        }
+    }
+
+    @GuardedBy("lock")
+    private fun unregisterClientLocked(token: IBinder): Boolean {
+        val client = clients.remove(token) ?: return false
+        token.unlinkToDeath(client.deathRecipient, 0)
+        return true
+    }
+
     companion object {
+        const val TAG = "Player"
+
+        const val MSG_REGISTER_CLIENT = 0
+        const val MSG_UNREGISTER_CLIENT = 1
+        const val MSG_SONG = 2
+        const val MSG_PAUSE = 3
+        const val MSG_STOP = 4
+
         const val PLAYBACK_CHANNEL_ID = "playback_channel"
         const val PLAYBACK_NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "audio_radiofreccia"
@@ -73,8 +176,9 @@ class PlayerService : Service() {
                         try {
                             val moshi: Moshi = Moshi.Builder().build()
                             SongJsonAdapter(moshi).fromJson(entry.value).let {
-                                if (it == song) return
+                                if (it == null || it == song) return
                                 song = it
+                                notifySong(it)
                                 playerNotificationManager.invalidate()
                                 mediaSessionConnector.invalidateMediaSessionMetadata()
                             }
@@ -130,7 +234,8 @@ class PlayerService : Service() {
             .setMediaDescriptionAdapter(object : MediaDescriptionAdapter {
                 override fun getCurrentContentTitle(player: Player): CharSequence {
                     song?.let {
-                        return it.songInfo.present?.mus_sng_title ?: it.songInfo.show.prg_title
+                        return it.songInfo?.present?.mus_sng_title ?: it.songInfo?.show?.prg_title
+                        ?: ""
                     }
                     return ""
                 }
@@ -139,7 +244,7 @@ class PlayerService : Service() {
 
                 override fun getCurrentContentText(player: Player): CharSequence? {
                     song?.let {
-                        return it.songInfo.present?.mus_art_name ?: it.songInfo.show.speakers
+                        return it.songInfo?.present?.mus_art_name ?: it.songInfo?.show?.speakers
                     }
                     return null
                 }
@@ -149,8 +254,8 @@ class PlayerService : Service() {
                     callback: BitmapCallback
                 ): Bitmap? {
                     song?.let {
-                        val url = it.songInfo.present?.mus_sng_itunescoverbig
-                            ?: it.songInfo.show.image400
+                        val url = it.songInfo?.present?.mus_sng_itunescoverbig
+                            ?: it.songInfo?.show?.image400 ?: return null
                         Utils.loadBitmap(
                             this@PlayerService, url
                         ) { bitmap ->
@@ -203,6 +308,8 @@ class PlayerService : Service() {
     }
 
     override fun onDestroy() {
+        unregisterClients()
+
         mediaSessionConnector.setPlayer(null)
         mediaSessionConnector.mediaSession.release()
         playerNotificationManager.setPlayer(null)
@@ -211,7 +318,7 @@ class PlayerService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder? = messenger.binder
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 }
