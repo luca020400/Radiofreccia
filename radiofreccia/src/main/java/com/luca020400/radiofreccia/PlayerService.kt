@@ -11,6 +11,7 @@ import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.Player.Listener
+import com.google.android.exoplayer2.audio.AudioAttributes
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.metadata.Metadata
@@ -54,8 +55,14 @@ class PlayerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .setUsage(C.USAGE_MEDIA)
+            .build()
+
         val player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true)
+            .setAudioAttributes(audioAttributes, true)
             .build()
 
         player.addListener(object : Listener {
