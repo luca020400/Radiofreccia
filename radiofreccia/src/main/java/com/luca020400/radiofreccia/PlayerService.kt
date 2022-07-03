@@ -25,8 +25,7 @@ import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.util.Util
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.google.gson.Gson
 import com.luca020400.radiofreccia.classes.Song
 import com.luca020400.radiofreccia.classes.UrlBitmap
@@ -34,7 +33,6 @@ import com.luca020400.radiofreccia.classes.UrlBitmap
 class PlayerService : Service() {
     private lateinit var wrapperPlayer: ForwardingPlayer
     private lateinit var playerNotificationManager: PlayerNotificationManager
-    private lateinit var mediaSession: MediaSessionCompat
     private lateinit var mediaSessionConnector: MediaSessionConnector
 
     private var song: Song? = null
@@ -47,13 +45,12 @@ class PlayerService : Service() {
     }
 
     private val mediaSource by lazy {
-        val mediaItem: MediaItem = MediaItem.Builder()
+        val mediaItem = MediaItem.Builder()
             .setUri(Uri.parse(MEDIA_URL))
             .build()
 
-        val dataSourceFactory = DefaultDataSourceFactory(
-            this, Util.getUserAgent(this, getString(R.string.app_name))
-        )
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+
         HlsMediaSource.Factory(dataSourceFactory)
             .createMediaSource(mediaItem)
     }
@@ -63,38 +60,39 @@ class PlayerService : Service() {
         const val PLAYBACK_NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "audio_radiofreccia"
         const val MEDIA_URL =
-            "https://streamcdnm23-dd782ed59e2a4e86aabf6fc508674b59.msvdn.net/live/S3160845/0tuSetc8UFkF/playlist_audio.m3u8"
+            "https://streamcdnm36-dd782ed59e2a4e86aabf6fc508674b59.msvdn.net/audiostream/S3160845/0tuSetc8UFkF/playlist_audio.m3u8"
     }
 
     override fun onCreate() {
         super.onCreate()
 
-        val audioManager = getSystemService(AudioManager::class.java) as AudioManager
+        val audioManager = getSystemService(AudioManager::class.java)
         val audioAttributes = AudioAttributesCompat.Builder()
             .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
             .setUsage(AudioAttributesCompat.USAGE_MEDIA)
             .build()
-        val audioFocusPlayer = AudioFocusWrapper(
+        val audioFocusPlayer = AudioFocusPlayer(
             audioAttributes,
             audioManager,
-            SimpleExoPlayer.Builder(this).build()
+            ExoPlayer.Builder(this).build()
         )
         audioFocusPlayer.addListener(object : Listener {
             override fun onMetadata(metadata: Metadata) {
-                try {
-                    // Reading the private data breaks the decoder.
-                    // PRIV: owner=com.apple.streaming.transportStreamTimestamp
-                    // val priv = metadata.get(0) as PrivFrame
-                    val frame = metadata.get(1) as TextInformationFrame
-                    with(Gson().fromJson(frame.value, Song::class.java)) {
-                        if (this == song) return
-                        song = this
-                        playerNotificationManager.invalidate()
-                        mediaSessionConnector.invalidateMediaSessionMetadata()
+                for (i in 0 until metadata.length()) {
+                    val entry = metadata.get(i)
+                    if (entry is TextInformationFrame && entry.id == "TEXT") {
+                        try {
+                            Gson().fromJson(entry.value, Song::class.java).let {
+                                if (it == song) return
+                                song = it
+                                playerNotificationManager.invalidate()
+                                mediaSessionConnector.invalidateMediaSessionMetadata()
+                            }
+                        } catch (e: Exception) {
+                            // Things can go horribly wrong here
+                            // Do nothing if we fail
+                        }
                     }
-                } catch (e: Exception) {
-                    // Things can go horribly wrong here
-                    // Do nothing if we fail
                 }
             }
 
@@ -125,12 +123,12 @@ class PlayerService : Service() {
         audioFocusPlayer.playWhenReady = true
 
         wrapperPlayer = object : ForwardingPlayer(audioFocusPlayer) {
-            override fun getAvailableCommands(): Player.Commands {
-                return Player.Commands.Builder()
-                    .add(COMMAND_PREPARE_STOP)
+            override fun getAvailableCommands() =
+                Player.Commands.Builder()
+                    .add(COMMAND_STOP)
                     .add(COMMAND_PLAY_PAUSE)
                     .build()
-            }
+
         }
 
         val playerNotificationManagerBuilder = PlayerNotificationManager.Builder(
@@ -139,59 +137,58 @@ class PlayerService : Service() {
             PLAYBACK_CHANNEL_ID
         ).setChannelNameResourceId(R.string.playback_channel_name)
             .setChannelDescriptionResourceId(R.string.playback_channel_description)
-            .setMediaDescriptionAdapter(
-                object : MediaDescriptionAdapter {
-                    override fun getCurrentContentTitle(player: Player): CharSequence {
-                        song?.let {
-                            return it.songInfo.present?.mus_sng_title ?: it.songInfo.show.prg_title
+            .setMediaDescriptionAdapter(object : MediaDescriptionAdapter {
+                override fun getCurrentContentTitle(player: Player): CharSequence {
+                    song?.let {
+                        return it.songInfo.present?.mus_sng_title ?: it.songInfo.show.prg_title
+                    }
+                    return ""
+                }
+
+                override fun createCurrentContentIntent(player: Player): PendingIntent? = null
+
+                override fun getCurrentContentText(player: Player): CharSequence? {
+                    song?.let {
+                        return it.songInfo.present?.mus_art_name ?: it.songInfo.show.speakers
+                    }
+                    return null
+                }
+
+                override fun getCurrentLargeIcon(
+                    player: Player,
+                    callback: BitmapCallback
+                ): Bitmap? {
+                    song?.let {
+                        val url = it.songInfo.present?.mus_sng_itunescoverbig
+                            ?: it.songInfo.show.image400
+                        if (url == urlBitmap.url) return urlBitmap.bitmap
+                        Utils.loadBitmap(
+                            this@PlayerService, url
+                        ) { bitmap ->
+                            urlBitmap.url = url
+                            urlBitmap.bitmap = bitmap
+                            callback.onBitmap(bitmap)
                         }
-                        return ""
                     }
+                    return null
+                }
+            })
+            .setNotificationListener(object : PlayerNotificationManager.NotificationListener {
+                override fun onNotificationPosted(
+                    notificationId: Int,
+                    notification: Notification,
+                    ongoing: Boolean
+                ) {
+                    startForeground(notificationId, notification)
+                }
 
-                    override fun createCurrentContentIntent(player: Player): PendingIntent? = null
-
-                    override fun getCurrentContentText(player: Player): CharSequence? {
-                        song?.let {
-                            return it.songInfo.present?.mus_art_name ?: it.songInfo.show.speakers
-                        }
-                        return null
-                    }
-
-                    override fun getCurrentLargeIcon(
-                        player: Player,
-                        callback: BitmapCallback
-                    ): Bitmap? {
-                        song?.let {
-                            val url = it.songInfo.present?.mus_sng_itunescoverbig
-                                ?: it.songInfo.show.image400
-                            if (url == urlBitmap.url) return urlBitmap.bitmap
-                            Utils.loadBitmap(
-                                this@PlayerService, url
-                            ) { bitmap: Bitmap ->
-                                urlBitmap.url = url
-                                urlBitmap.bitmap = bitmap
-                                callback.onBitmap(bitmap)
-                            }
-                        }
-                        return null
-                    }
-                }).setNotificationListener(
-                object : PlayerNotificationManager.NotificationListener {
-                    override fun onNotificationPosted(
-                        notificationId: Int,
-                        notification: Notification,
-                        ongoing: Boolean
-                    ) {
-                        startForeground(notificationId, notification)
-                    }
-
-                    override fun onNotificationCancelled(
-                        notificationId: Int,
-                        dismissedByUser: Boolean
-                    ) {
-                        stopSelf()
-                    }
-                })
+                override fun onNotificationCancelled(
+                    notificationId: Int,
+                    dismissedByUser: Boolean
+                ) {
+                    stopSelf()
+                }
+            })
         playerNotificationManager = playerNotificationManagerBuilder.build()
         playerNotificationManager.setUseFastForwardAction(false)
         playerNotificationManager.setUseFastForwardActionInCompactView(false)
@@ -202,7 +199,7 @@ class PlayerService : Service() {
         playerNotificationManager.setUseStopAction(true)
         playerNotificationManager.setPlayer(wrapperPlayer)
 
-        mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
+        val mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG)
         mediaSession.isActive = true
         playerNotificationManager.setMediaSessionToken(mediaSession.sessionToken)
 
@@ -221,8 +218,8 @@ class PlayerService : Service() {
     }
 
     override fun onDestroy() {
-        mediaSession.release()
         mediaSessionConnector.setPlayer(null)
+        mediaSessionConnector.mediaSession.release()
         playerNotificationManager.setPlayer(null)
         wrapperPlayer.release()
         unregisterReceiver(mediaReceiver)

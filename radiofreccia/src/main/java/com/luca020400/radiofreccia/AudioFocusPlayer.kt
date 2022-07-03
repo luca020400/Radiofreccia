@@ -21,16 +21,11 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import androidx.media.AudioAttributesCompat
 import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.SimpleExoPlayer
 
-/**
- * Wrapper around a [SimpleExoPlayer] simplifies playback by automatically handling
- * audio focus using [AudioFocusRequest].
- */
-class AudioFocusWrapper(
+class AudioFocusPlayer(
     private val audioAttributes: AudioAttributesCompat,
     private val audioManager: AudioManager,
-    private val player: SimpleExoPlayer
+    private val player: ExoPlayer
 ) : ExoPlayer by player {
     companion object {
         private const val MEDIA_VOLUME_DEFAULT = 1.0f
@@ -39,8 +34,8 @@ class AudioFocusWrapper(
 
     private var shouldPlayWhenReady = false
 
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener {
+        when (it) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 if (shouldPlayWhenReady || player.playWhenReady) {
                     player.playWhenReady = true
